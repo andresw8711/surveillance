@@ -1,12 +1,10 @@
-import dash
-from dash import dcc, html, Input, Output
+from dash import Dash, dcc, html, Input, Output
 import dash_cytoscape as cyto
 
-# Inicializar app
-app = dash.Dash(__name__)
+app = Dash(__name__)
 app.title = "Surveillance Petrolero"
 
-# Queries clave
+# Queries
 queries = {
     "ETL_SQL": """
 -- Opción 1: Agrupación en SQL (ETL)
@@ -35,42 +33,113 @@ WHERE
 """
 }
 
-# Elementos del diagrama de flujo
-flow_elements = [
-    # Opción 1
-    {"data": {"id": "etl", "label": "SierraCol (DB - SQL)"}, "position": {"x": 50, "y": 100}},
-    {"data": {"id": "grp", "label": "Datos Agrupados (YAML)"}, "position": {"x": 250, "y": 100}},
-    {"data": {"id": "cdf", "label": "CDF: Assets TF"}, "position": {"x": 450, "y": 100}},
-    {"data": {"id": "app", "label": "Aplicativo (SDK, GraphQL)"}, "position": {"x": 650, "y": 100}},
+# Elementos por opción
+def get_flow_elements(option):
+    if option == "ETL_SQL":
+        return [
+            {"data": {
+                "id": "etl",
+                "label": "SierraCol (DB - SQL)",
+                "title": "Base de datos SQL (Oracle, SQL Server) donde se almacenan los datos crudos de los pozos."
+            }, "position": {"x": 50, "y": 150}},
+            
+            {"data": {
+                "id": "grp",
+                "label": "Datos Agrupados (YAML)",
+                "title": "Querys en YAML que agrupan y preprocesan los datos antes de enviarlos a CDF."
+            }, "position": {"x": 300, "y": 150}},
+            
+            {"data": {
+                "id": "cdf",
+                "label": "CDF: Raw (Assets, Timeseries...)",
+                "title": "Datos preprocesados almacenados directamente en CDF como Timeseries y Assets."
+            }, "position": {"x": 550, "y": 150}},
 
-    # Opción 2
-    {"data": {"id": "cd", "label": "CDF: Raw (Datos Maestros)"}, "position": {"x": 50, "y": 250}},
-    {"data": {"id": "ass", "label": "CDF: Relaciones (MJ)"}, "position": {"x": 250, "y": 250}},
-    {"data": {"id": "rel", "label": "CDF: Assets TF"}, "position": {"x": 450, "y": 250}},
-    {"data": {"id": "gql", "label": "Aplicativo (SDK, GraphQL)  "}, "position": {"x": 650, "y": 250}},
+           {"data": {
+                "id": "rel",
+                "label": "CDF: (Transformacion)",
+                "title": "Transformaciones aplicadas directamente dentro de CDF sobre los datos preprocesados."
+            }, "position": {"x": 800, "y": 150}},
 
-    # Flechas opción 1
-    {"data": {"source": "etl", "target": "grp"}},
-    {"data": {"source": "grp", "target": "cdf"}},
-    {"data": {"source": "cdf", "target": "app"}},
+            {"data": {
+                "id": "app",
+                "label": "Aplicativo (SDK, GraphQL)",
+                "title": "Aplicación que accede a los datos procesados mediante SDK o GraphQL API."
+            }, "position": {"x": 1050, "y": 150}},
+            
+            {"data": {
+                "id": "title",
+                "label": "🔷 Flujo ETL - SQL"
+            }, "position": {"x": 475, "y": 50}, "classes": "title"},
 
-    # Flechas opción 2
-    {"data": {"source": "cd", "target": "ass"}},
-    {"data": {"source": "ass", "target": "rel"}},
-    {"data": {"source": "rel", "target": "gql"}},
-]   
+            {"data": {"source": "etl", "target": "grp"}},
+            {"data": {"source": "grp", "target": "cdf"}},
+            {"data": {"source": "cdf", "target": "rel"}},            
+            {"data": {"source": "cdf", "target": "app"}}
+        ]
+    else:
+        return [
+            {"data": {
+                "id": "cd",
+                "label": "CDF: Raw (Assets, Timeseries...)",
+                "title": "Datos crudos de los pozos almacenados directamente en CDF como Timeseries y Assets."
+            }, "position": {"x": 100, "y": 350}},
+            
+            {"data": {
+                "id": "ass",
+                "label": "CDF: Relaciones",
+                "title": "Relaciones jerárquicas entre los Assets, gestionadas en el diccionario de CDF."
+            }, "position": {"x": 350, "y": 350}},
+            
+            {"data": {
+                "id": "rel",
+                "label": "CDF: (Transformacion)",
+                "title": "Transformaciones aplicadas directamente dentro de CDF sobre los datos relacionados."
+            }, "position": {"x": 600, "y": 350}},
+            
+            {"data": {
+                "id": "gql",
+                "label": "Aplicativo (SDK, GraphQL)",
+                "title": "Aplicación que consulta los datos procesados desde CDF usando el SDK o GraphQL."
+            }, "position": {"x": 850, "y": 350}},
+            
+            {"data": {
+                "id": "title",
+                "label": "🟢 Flujo ELT - CDF"
+            }, "position": {"x": 475, "y": 270}, "classes": "title"},
+
+            {"data": {"source": "cd", "target": "ass"}},
+            {"data": {"source": "ass", "target": "rel"}},
+            {"data": {"source": "rel", "target": "gql"}}
+        ]
+
 
 cyto_stylesheet = [
     {"selector": "node", "style": {
         "label": "data(label)",
         "text-valign": "center",
+        "text-halign": "center",
         "color": "white",
         "background-color": "#0074D9",
-        "width": "180px",
-        "height": "60px",
+        "width": "220px",  # Aumentado
+        "height": "80px",  # Aumentado
         "font-size": "14px",
         "border-width": "2px",
         "border-color": "#333",
+        "shape": "roundrectangle",
+        "text-wrap": "wrap",  # Habilita el salto de línea
+        "text-max-width": "200px"  # Máximo ancho antes de hacer wrap
+    }},
+        {"selector": ".title", "style": {
+        "background-color": "#f0f0f0",
+        "color": "#2c3e50",
+        "font-weight": "bold",
+        "border-color": "#ccc",
+        "font-size": "16px",
+        "width": "240px",
+        "height": "40px",
+        "text-valign": "center",
+        "text-halign": "center",
         "shape": "roundrectangle"
     }},
     {"selector": "edge", "style": {
@@ -82,20 +151,10 @@ cyto_stylesheet = [
     }}
 ]
 
-# Layout
+# Layout general
 app.layout = html.Div([
     html.H1("Flujo de Datos: Surveillance Petrolero", style={"textAlign": "center"}),
 
-    # Diagrama de flujo
-    cyto.Cytoscape(
-        id="flujo-datos",
-        layout={"name": "preset"},
-        style={"width": "100%", "height": "300px"},
-        elements=flow_elements,
-        stylesheet=cyto_stylesheet
-    ),
-
-    # Selector de opción
     html.Div([
         dcc.RadioItems(
             id="opcion-selector",
@@ -104,11 +163,22 @@ app.layout = html.Div([
                 {"label": "Opción 2: ELT (Procesar en CDF)", "value": "ELT_CDF"}
             ],
             value="ETL_SQL",
-            style={"margin": "20px"}
+            labelStyle={'display': 'inline-block', 'marginRight': '20px'},
+            style={"textAlign": "center", "margin": "20px"}
         )
-    ], style={"textAlign": "center"}),
+    ]),
 
-    # Consulta mostrada
+    # Contenedor para el tooltip
+    html.Div(id="tooltip-container", style={"position": "absolute", "background-color": "rgba(0, 0, 0, 0.75)", "color": "white", "padding": "5px", "border-radius": "5px", "display": "none"}),
+
+    cyto.Cytoscape(
+        id="flujo-datos",
+        layout={"name": "preset"},
+        style={"width": "100%", "height": "200px"},
+        elements=get_flow_elements("ETL_SQL"),
+        stylesheet=cyto_stylesheet
+    ),
+
     html.Div([
         html.H3("Query Clave", style={"color": "#34495e"}),
         dcc.Markdown(
@@ -125,14 +195,29 @@ app.layout = html.Div([
     ], style={"width": "80%", "margin": "0 auto"})
 ])
 
-# Callback para mostrar la query
+# Callbacks
 @app.callback(
-    Output("query-output", "children"),
-    Input("opcion-selector", "value")
-)
-def update_query(opcion):
-    return f"```sql\n{queries[opcion]}\n```"
+    [Output("query-output", "children"),
+     Output("flujo-datos", "elements"),
+     Output("tooltip-container", "style"),
+     Output("tooltip-container", "children")],
+    [Input("opcion-selector", "value"),
+     Input("flujo-datos", "mouseoverNodeData"),
+     Input("flujo-datos", "mouseoutNodeData")]
+)   
+def update_content(opcion, mouseover_node, mouseout_node):
+    query = f"```sql\n{queries[opcion]}\n```"
+    elements = get_flow_elements(opcion)
 
-# Ejecutar
+    # Mostrar tooltip
+    tooltip_style = {"display": "none"}
+    tooltip_text = ""
+    if mouseover_node:
+        tooltip_text = mouseover_node.get("title", "")
+        tooltip_style = {"position": "absolute", "background-color": "rgba(0, 0, 0, 0.75)", "color": "white", "padding": "5px", "border-radius": "5px", "top": "100px", "left": "50px"}
+
+    return query, elements, tooltip_style, tooltip_text
+
+# Run app
 if __name__ == "__main__":
     app.run(debug=True, port=8050)
